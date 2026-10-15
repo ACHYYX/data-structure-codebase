@@ -34,6 +34,8 @@ void SLInsert(SL* ps, int i, SLDataType x);
 
 //删除顺序表中的第i个元素，返回被删除的值
 SLDataType SLDelete(SL* ps, int i);
+//把顺序表中第i个下标的元素修改为x
+void SLModify(SL* ps, int i, SLDataType x);
 
 //打印顺序表中的元素
 void SLPrint(const SL* ps);

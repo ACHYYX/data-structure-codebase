@@ -365,6 +365,49 @@ TEST_F(SeqListTest, PopOnEmptyListIsSafeInReleaseBuild)
 }
 #endif
 
+// 越界入参在 Release 构建（assert 失效）下，应该被函数内部的兜底逻辑安全拒绝：
+// 不能越界写、不能把 size 改成负数、也不能崩溃。
+// 这组用例与上面的死亡测试正好互补——Debug 下验"拦得住"（assert 终止进程），
+// Release 下验"退得干净"（优雅返回且数据不变）。
+#ifdef NDEBUG
+TEST_F(SeqListTest, OutOfRangeInputIsRejectedSafely)
+{
+    FillOneToN(3);                                  // 1 2 3
+
+    // ---- SLInsert 的越界兜底：i 为负数 / i 超出 size ----
+    SLInsert(&list_, -1, 100);                      // 负数下标
+    EXPECT_SEQ(&list_, 1, 2, 3);                    // 内容不受影响
+    SLInsert(&list_, 99, 100);                      // 超过 size
+    EXPECT_SEQ(&list_, 1, 2, 3);
+    SLInsert(&list_, 3, 4);                         // 再来一个合法的，确认状态没被弄坏
+    EXPECT_SEQ(&list_, 1, 2, 3, 4);
+
+    // ---- SLDelete 的越界兜底：i 为负数 / i 超出 size ----
+    EXPECT_EQ(SLDelete(&list_, -1), 0);             // 越界时返回 0
+    EXPECT_SEQ(&list_, 1, 2, 3, 4);
+    EXPECT_EQ(SLDelete(&list_, 99), 0);
+    EXPECT_SEQ(&list_, 1, 2, 3, 4);
+    EXPECT_EQ(SLDelete(&list_, SLSize(&list_)), 0); // i == size 同样属于越界
+    EXPECT_SEQ(&list_, 1, 2, 3, 4);
+    EXPECT_EQ(SLDelete(&list_, 0), 1);              // 合法删除仍然正常
+    EXPECT_SEQ(&list_, 2, 3, 4);
+
+    // ---- 空表上的越界删除 ----
+    while (!SLEmpty(&list_))
+    {
+        SLPopBack(&list_);
+    }
+    EXPECT_EQ(SLDelete(&list_, 0), 0);
+    EXPECT_EQ(SLDelete(&list_, -1), 0);
+    EXPECT_EQ(SLSize(&list_), 0);                   // size 不能变成负数
+    EXPECT_EQ(list_.size, 0);
+    EXPECT_TRUE(SLEmpty(&list_));
+    // ---- SLModify 的越界兜底：i 为负数 / i 超出 size ----
+    SLModify(&list_, -1, 999);
+    SLModify(&list_, 99, 999);
+    EXPECT_EQ(SLSize(&list_), 0);                   // 空表不能被改出元素
+}
+#endif
 // =============================================================================
 // 十一、GetElem：按下标取值
 // =============================================================================
@@ -379,7 +422,56 @@ TEST_F(SeqListTest, GetElemReturnsValueAtIndex)
 }
 
 // =============================================================================
-// 十二、LocateElem：按值查找下标
+// 十二、SLModify：按位置修改元素
+// =============================================================================
+
+// 头、中、尾三个位置分别修改，校验改完的值正确、其它元素不受影响
+TEST_F(SeqListTest, ModifyAtHeadMiddleAndTail)
+{
+    FillOneToN(5);                              // 1 2 3 4 5
+
+    SLModify(&list_, 0, 100);                   // 改头
+    EXPECT_SEQ(&list_, 100, 2, 3, 4, 5);
+
+    SLModify(&list_, 2, 300);                   // 改中间
+    EXPECT_SEQ(&list_, 100, 2, 300, 4, 5);
+
+    SLModify(&list_, 4, 500);                   // 改尾
+    EXPECT_SEQ(&list_, 100, 2, 300, 4, 500);
+}
+
+// 修改只是替换值，不应该改变长度
+TEST_F(SeqListTest, ModifyDoesNotChangeSize)
+{
+    FillOneToN(5);
+
+    SLModify(&list_, 1, 999);
+
+    EXPECT_EQ(SLSize(&list_), 5);
+}
+
+// 改完之后按值查找应该查到新值、查不到旧值
+TEST_F(SeqListTest, ModifyIsVisibleToLocateElem)
+{
+    FillOneToN(5);                              // 1 2 3 4 5
+
+    SLModify(&list_, 2, 77);                    // 原来的 3 变成 77
+
+    EXPECT_EQ(LocateElem(&list_, 77), 2);       // 新值能查到
+    EXPECT_EQ(LocateElem(&list_, 3), -1);       // 旧值查不到了
+}
+
+// 改成和原来相同的值也不应该有问题
+TEST_F(SeqListTest, ModifyWithSameValueIsIdempotent)
+{
+    FillOneToN(3);
+
+    SLModify(&list_, 1, 2);
+
+    EXPECT_SEQ(&list_, 1, 2, 3);
+}
+// =============================================================================
+// 十三、LocateElem：按值查找下标
 // =============================================================================
 
 // 找得到：返回对应下标
@@ -417,7 +509,7 @@ TEST_F(SeqListTest, LocateElemOnEmptyList)
 }
 
 // =============================================================================
-// 十三、SLPrint：打印内容
+// 十四、SLPrint：打印内容
 //     gtest 提供了捕获标准输出的工具，可以把打印结果抓下来做精确比对，
 //     这样连输出格式（元素后跟空格、结尾换行）也一起被测试覆盖了。
 // =============================================================================
@@ -453,7 +545,7 @@ TEST_F(SeqListTest, PrintDoesNotModifyList)
 }
 
 // =============================================================================
-// 十四、综合用例：多种操作交替执行，验证整体一致性
+// 十五、综合用例：多种操作交替执行，验证整体一致性
 // =============================================================================
 
 TEST_F(SeqListTest, MixedOperationsKeepListConsistent)
@@ -519,7 +611,7 @@ TEST_F(SeqListTest, StressManyInsertsAndDeletes)
 }
 
 // =============================================================================
-// 十五、越界访问的死亡测试（Death Test）
+// 十六、越界访问的死亡测试（Death Test）
 //     顺序表内部用 assert 做下标合法性检查，越界时会让程序主动终止。
 //     EXPECT_DEATH 会在子进程中执行这段代码，用来验证"越界确实被拦住了"，
 //     这样连"错误输入的防护"本身也变成了可自动验证的测试。
@@ -564,10 +656,22 @@ TEST(SeqListDeathTest, InsertDiesWhenIndexGreaterThanSize)
     SLDestroy(&s);
 }
 
+
+// 修改时下标越界（合法范围是 [0, size-1]）
+TEST(SeqListDeathTest, ModifyDiesWhenIndexOutOfRange)
+{
+    SL s;
+    SLInit(&s);
+    SLPushBack(&s, 1);
+
+    EXPECT_DEATH(SLModify(&s, 1, 0), "");
+
+    SLDestroy(&s);
+}
 #endif  // !NDEBUG
 
 // =============================================================================
-// 十六、内存泄漏检查
+// 十七、内存泄漏检查
 //     用 CRT 的堆检查点（_CrtMemCheckpoint / _CrtMemDifference）在一段代码前后
 //     各拍一张"内存快照"，比较两张快照的差异即可判断有没有泄漏。
 //     这种方式比全局开启 _CRTDBG_LEAK_CHECK_DF 更精确：既不会把 gtest 框架

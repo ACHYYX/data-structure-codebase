@@ -5,4 +5,5 @@
   </Configurations>
   <Project Path="SeqList_2026_10_14/SeqList_2026_10_14.vcxproj" Id="98605959-4331-43db-8ab0-6ca22a36f4e3" />
   <Project Path="SeqListGTest/SeqListGTest.vcxproj" Id="21ea486a-dca8-4f21-9d0b-8e64a0de6ca6" />
+  <Project Path="SeqListMenu/SeqListMenu.vcxproj" Id="bfb971af-1093-4555-adb8-cd6797fab35d" />
 </Solution>

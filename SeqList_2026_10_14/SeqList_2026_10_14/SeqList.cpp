@@ -107,6 +107,20 @@ SLDataType SLDelete(SL* ps, int i)
 
 	return ret;
 }
+//把顺序表中第i个下标的元素修改为x
+void SLModify(SL* ps, int i, SLDataType x)
+{
+	assert(ps);
+	assert(i >= 0 && i < ps->size);
+
+	//Release版本中assert会失效，这里再兜底一次，避免越界写
+	if (i < 0 || i >= ps->size)
+	{
+		return;
+	}
+
+	ps->arr[i] = x;
+}
 
 //打印顺序表中的元素
 void SLPrint(const SL* ps)
