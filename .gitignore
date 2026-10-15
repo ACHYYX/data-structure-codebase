@@ -7,6 +7,9 @@ bin-release/
 # Other files and folders
 .settings/
 
+# NuGet 包还原目录（位于解决方案目录下，可由 packages.config 自动还原，无需提交）
+packages/
+
 # Executables
 *.swf
 *.air
